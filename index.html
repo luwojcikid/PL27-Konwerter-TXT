@@ -1,0 +1,683 @@
+```html
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Konwerter SAP TXT do Excel</title>
+
+    <!-- SheetJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+
+        h1 {
+            color: #333;
+        }
+
+        .file-container {
+            background: #fff;
+            padding: 20px;
+            border-radius: 6px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            margin-bottom: 15px;
+            font-size: 14px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #218838;
+        }
+
+        #outputTable {
+            margin-top: 20px;
+            overflow-x: auto;
+            background: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        }
+
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin-bottom: 20px;
+            font-size: 12px;
+        }
+
+        th,
+        td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+            white-space: nowrap;
+        }
+
+        th {
+            background-color: #f2f2f2;
+            position: sticky;
+            top: 0;
+        }
+
+        .info {
+            margin-top: 10px;
+            color: #555;
+            font-size: 13px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Konwerter SAP TXT do Excel</h1>
+
+    <div class="file-container">
+
+        <label for="fileInput">
+            <strong>Wybierz raport SAP TXT:</strong>
+        </label>
+
+        <br><br>
+
+        <input
+            type="file"
+            id="fileInput"
+            accept=".txt"
+            onchange="loadFile()"
+        >
+
+        <br>
+
+        <button onclick="exportToExcel()">
+            Eksportuj do Excela
+        </button>
+
+        <div class="info">
+            Format: SAP → Resource Mgmt → Queue → Warehouse Order
+        </div>
+
+    </div>
+
+    <h3>Podgląd danych:</h3>
+
+    <div id="outputTable">
+        <i>Wybierz plik TXT, aby zobaczyć podgląd...</i>
+    </div>
+
+
+<script>
+
+    let selectedFile = null;
+
+    let sapData = [];
+
+
+    // =========================================================
+    // CZYSZCZENIE TEKSTU
+    // =========================================================
+
+    function cleanText(value) {
+
+        if (
+            value === null ||
+            value === undefined
+        ) {
+            return '';
+        }
+
+        return String(value)
+
+            // Zamiana twardej spacji SAP
+            .replace(/\u00A0/g, ' ')
+
+            // Spacje z początku
+            .replace(/^\s+/, '')
+
+            // Spacje z końca
+            .replace(/\s+$/, '');
+    }
+
+
+    // =========================================================
+    // WCZYTANIE PLIKU
+    // =========================================================
+
+    function loadFile() {
+
+        const fileInput =
+            document.getElementById('fileInput');
+
+        const file =
+            fileInput.files[0];
+
+        if (!file) {
+            return;
+        }
+
+        selectedFile = file;
+
+        const reader =
+            new FileReader();
+
+
+        reader.onload = function(e) {
+
+            const content =
+                e.target.result;
+
+
+            // =================================================
+            // PODZIAŁ NA WIERSZE
+            // =================================================
+
+            const lines =
+                content
+                    .replace(/\r\n/g, '\n')
+                    .replace(/\r/g, '\n')
+                    .split('\n');
+
+
+            sapData = [];
+
+
+            // =================================================
+            // SZUKAMY NAGŁÓWKA
+            // =================================================
+
+            let headerFound = false;
+
+
+            lines.forEach(function(line) {
+
+                // Pomijamy wszystko bez separatora |
+                if (!line.includes('|')) {
+                    return;
+                }
+
+
+                // Pomijamy linie z samych kresek
+                if (
+                    line.replace(/[|\-\s]/g, '') === ''
+                ) {
+                    return;
+                }
+
+
+                // =================================================
+                // PODZIAŁ PO |
+                // =================================================
+
+                let columns =
+                    line.split('|');
+
+
+                // Usunięcie pustego elementu
+                // przed pierwszą kolumną
+
+                if (
+                    columns.length >= 2 &&
+                    columns[0].trim() === ''
+                ) {
+                    columns.shift();
+                }
+
+
+                // Usunięcie pustego elementu
+                // po ostatniej kolumnie
+
+                if (
+                    columns.length >= 1 &&
+                    columns[columns.length - 1].trim() === ''
+                ) {
+                    columns.pop();
+                }
+
+
+                // =================================================
+                // CZYSZCZENIE KOLUMN
+                // =================================================
+
+                columns =
+                    columns.map(function(column) {
+
+                        return cleanText(column);
+
+                    });
+
+
+                // =================================================
+                // ZNALEZIENIE NAGŁÓWKA
+                // =================================================
+
+                if (
+                    !headerFound &&
+                    columns.includes('Whse Order')
+                ) {
+
+                    /*
+                     * Usuwamy pierwszą kolumnę:
+                     *
+                     * Counter
+                     */
+
+                    columns.shift();
+
+
+                    sapData.push(columns);
+
+
+                    headerFound = true;
+
+
+                    return;
+                }
+
+
+                // =================================================
+                // WIERSZE DANYCH
+                // =================================================
+
+                if (headerFound) {
+
+                    /*
+                     * Usuwamy pierwszą kolumnę:
+                     *
+                     * Counter
+                     */
+
+                    columns.shift();
+
+
+                    const hasData =
+                        columns.some(function(column) {
+
+                            return column !== '';
+
+                        });
+
+
+                    if (hasData) {
+
+                        sapData.push(columns);
+
+                    }
+
+                }
+
+            });
+
+
+            // =================================================
+            // PODGLĄD
+            // =================================================
+
+            showPreview();
+
+        };
+
+
+        reader.onerror = function() {
+
+            alert(
+                'Nie udało się odczytać pliku.'
+            );
+
+        };
+
+
+        // Odczyt TXT
+        reader.readAsText(
+            file,
+            'UTF-8'
+        );
+
+    }
+
+
+    // =========================================================
+    // PODGLĄD
+    // =========================================================
+
+    function showPreview() {
+
+        const output =
+            document.getElementById('outputTable');
+
+
+        if (
+            !sapData ||
+            sapData.length === 0
+        ) {
+
+            output.innerHTML =
+                '<b>Nie znaleziono danych SAP.</b>';
+
+            return;
+        }
+
+
+        let html =
+            '<table>';
+
+
+        // =================================================
+        // NAGŁÓWEK
+        // =================================================
+
+        html += '<thead>';
+
+        html += '<tr>';
+
+
+        sapData[0].forEach(function(column) {
+
+            html +=
+                '<th>' +
+                escapeHtml(column) +
+                '</th>';
+
+        });
+
+
+        html += '</tr>';
+
+        html += '</thead>';
+
+
+        // =================================================
+        // DANE
+        // =================================================
+
+        html += '<tbody>';
+
+
+        /*
+         * Podgląd maksymalnie 100 rekordów.
+         * Eksport obejmuje wszystkie rekordy.
+         */
+
+        const previewRows =
+            Math.min(
+                sapData.length,
+                101
+            );
+
+
+        for (
+            let i = 1;
+            i < previewRows;
+            i++
+        ) {
+
+            html += '<tr>';
+
+
+            sapData[i].forEach(function(column) {
+
+                html +=
+                    '<td>' +
+                    escapeHtml(column) +
+                    '</td>';
+
+            });
+
+
+            html += '</tr>';
+
+        }
+
+
+        html += '</tbody>';
+
+        html += '</table>';
+
+
+        html +=
+            '<div class="info">' +
+            'Znaleziono ' +
+            (sapData.length - 1) +
+            ' rekordów.' +
+            '</div>';
+
+
+        output.innerHTML = html;
+
+    }
+
+
+    // =========================================================
+    // ZABEZPIECZENIE HTML
+    // =========================================================
+
+    function escapeHtml(text) {
+
+        const div =
+            document.createElement('div');
+
+        div.textContent = text;
+
+        return div.innerHTML;
+
+    }
+
+
+    // =========================================================
+    // EKSPORT DO EXCEL
+    // =========================================================
+
+    function exportToExcel() {
+
+        if (
+            !sapData ||
+            sapData.length === 0
+        ) {
+
+            alert(
+                'Najpierw wybierz prawidłowy plik SAP TXT.'
+            );
+
+            return;
+        }
+
+
+        // =================================================
+        // NOWY SKOROSZYT
+        // =================================================
+
+        const wb =
+            XLSX.utils.book_new();
+
+
+        // =================================================
+        // CZYSZCZENIE DANYCH
+        // =================================================
+
+        const cleanedData =
+            sapData.map(function(row) {
+
+                return row.map(function(cell) {
+
+                    return cleanText(cell);
+
+                });
+
+            });
+
+
+        // =================================================
+        // UTWORZENIE ARKUSZA
+        // =================================================
+
+        const ws =
+            XLSX.utils.aoa_to_sheet(
+                cleanedData
+            );
+
+
+        // =================================================
+        // WSZYSTKO JAKO TEKST
+        // =================================================
+
+        Object.keys(ws).forEach(function(address) {
+
+            if (
+                address.startsWith('!')
+            ) {
+                return;
+            }
+
+
+            const cell =
+                ws[address];
+
+
+            if (cell) {
+
+                cell.t = 's';
+
+                cell.v =
+                    cleanText(cell.v);
+
+            }
+
+        });
+
+
+        // =================================================
+        // SZEROKOŚĆ KOLUMN
+        // =================================================
+
+        const maxCols =
+            Math.max(
+                ...cleanedData.map(
+                    row => row.length
+                )
+            );
+
+
+        const columnWidths = [];
+
+
+        for (
+            let col = 0;
+            col < maxCols;
+            col++
+        ) {
+
+            let maxLength = 10;
+
+
+            cleanedData.forEach(function(row) {
+
+                if (
+                    row[col] !== undefined &&
+                    row[col] !== null
+                ) {
+
+                    const length =
+                        String(row[col]).length;
+
+
+                    if (
+                        length > maxLength
+                    ) {
+
+                        maxLength =
+                            length;
+
+                    }
+
+                }
+
+            });
+
+
+            columnWidths.push({
+
+                wch:
+                    Math.min(
+                        maxLength + 2,
+                        30
+                    )
+
+            });
+
+        }
+
+
+        ws['!cols'] =
+            columnWidths;
+
+
+        // =================================================
+        // ZAMROŻENIE NAGŁÓWKA
+        // =================================================
+
+        ws['!freeze'] = {
+            xSplit: 0,
+            ySplit: 1
+        };
+
+
+        // =================================================
+        // DODANIE ARKUSZA
+        // =================================================
+
+        XLSX.utils.book_append_sheet(
+            wb,
+            ws,
+            'Warehouse Order'
+        );
+
+
+        // =================================================
+        // NAZWA PLIKU
+        // =================================================
+
+        const today =
+            new Date()
+                .toISOString()
+                .slice(0, 10);
+
+
+        const filename =
+            'SAP_Warehouse_Order_' +
+            today +
+            '.xlsx';
+
+
+        // =================================================
+        // EKSPORT
+        // =================================================
+
+        XLSX.writeFile(
+            wb,
+            filename
+        );
+
+    }
+
+</script>
+
+</body>
+</html>
+```
