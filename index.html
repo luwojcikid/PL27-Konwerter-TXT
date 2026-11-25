@@ -194,6 +194,7 @@
             <p class="info">
                 Oryginalne nagłówki SAP zostaną zachowane.
                 Kolumna <strong>Counter</strong> zostanie usunięta.
+                Powtórzone nagłówki w środku raportu zostaną pominięte.
             </p>
 
         </div>
@@ -226,7 +227,9 @@
 
         function setStatus(message, type = "") {
             statusBox.textContent = message;
-            statusBox.className = "status" + (type ? " " + type : "");
+
+            statusBox.className =
+                "status" + (type ? " " + type : "");
         }
 
         function cleanText(value) {
@@ -238,10 +241,15 @@
         function splitSapLine(line) {
             let columns = line.split("|");
 
-            if (columns.length && columns[0].trim() === "") {
+            // Usuwamy pusty element przed pierwszym separatorem.
+            if (
+                columns.length &&
+                columns[0].trim() === ""
+            ) {
                 columns.shift();
             }
 
+            // Usuwamy pusty element po ostatnim separatorze.
             if (
                 columns.length &&
                 columns[columns.length - 1].trim() === ""
@@ -283,31 +291,46 @@
 
                 let originalHeader = null;
                 let counterIndex = -1;
+
                 let skippedLines = 0;
-                let rows = [];
+                let repeatedHeaders = 0;
+
+                const rows = [];
 
                 for (const line of lines) {
+
+                    // Pomijamy linie bez separatora kolumn.
                     if (!line.includes("|")) {
                         continue;
                     }
 
-                    // Pominięcie linii oddzielających z samych kresek.
-                    if (line.replace(/[|\-\s]/g, "") === "") {
+                    // Pomijamy linie oddzielające z samych kresek.
+                    if (
+                        line.replace(/[|\-\s]/g, "") === ""
+                    ) {
                         continue;
                     }
 
                     const columns = splitSapLine(line);
 
+                    // Szukamy pierwszego nagłówka raportu.
                     if (!originalHeader) {
+
                         if (
                             columns.includes("Whse Order") &&
                             columns.includes("Counter")
                         ) {
-                            originalHeader = columns;
-                            counterIndex = columns.indexOf("Counter");
 
+                            originalHeader = columns;
+
+                            counterIndex =
+                                columns.indexOf("Counter");
+
+                            // Zapisujemy oryginalny nagłówek
+                            // bez kolumny Counter.
                             const header = columns.filter(
-                                (_, index) => index !== counterIndex
+                                (_, index) =>
+                                    index !== counterIndex
                             );
 
                             rows.push(header);
@@ -316,36 +339,61 @@
                         continue;
                     }
 
-                    // Wiersz musi mieć taką samą liczbę pól jak nagłówek.
-                    if (columns.length !== originalHeader.length) {
+                    // Sprawdzamy, czy nagłówek powtórzył się
+                    // w dalszej części raportu.
+                    const isRepeatedHeader =
+                        columns.length === originalHeader.length &&
+                        columns.every(
+                            (value, index) =>
+                                value === originalHeader[index]
+                        );
+
+                    if (isRepeatedHeader) {
+                        repeatedHeaders++;
+                        continue;
+                    }
+
+                    // Każdy wiersz danych powinien mieć tyle samo
+                    // kolumn co oryginalny nagłówek.
+                    if (
+                        columns.length !== originalHeader.length
+                    ) {
                         skippedLines++;
                         continue;
                     }
 
+                    // Usuwamy kolumnę Counter z wiersza.
                     const row = columns.filter(
-                        (_, index) => index !== counterIndex
+                        (_, index) =>
+                            index !== counterIndex
                     );
 
-                    if (row.some(value => value !== "")) {
+                    // Pomijamy całkowicie puste wiersze.
+                    if (
+                        row.some(value => value !== "")
+                    ) {
                         rows.push(row);
                     }
                 }
 
                 if (!originalHeader) {
                     throw new Error(
-                        "Nie znaleziono nagłówków „Counter” i „Whse Order”. " +
-                        "Sprawdź, czy wybrano właściwy raport SAP."
+                        "Nie znaleziono nagłówków „Counter” i " +
+                        "„Whse Order”. Sprawdź, czy wybrano " +
+                        "właściwy raport SAP."
                     );
                 }
 
                 if (rows.length <= 1) {
                     throw new Error(
-                        "Znaleziono nagłówek, ale nie znaleziono żadnych danych."
+                        "Znaleziono nagłówek, ale nie znaleziono " +
+                        "żadnych danych."
                     );
                 }
 
                 sapData = rows;
                 sourceFileName = file.name;
+
                 exportButton.disabled = false;
 
                 showPreview();
@@ -353,20 +401,29 @@
                 let message =
                     "Wczytano plik: " + file.name +
                     " | Liczba wierszy: " + (sapData.length - 1) +
-                    " | Liczba kolumn po usunięciu Counter: " +
-                    sapData[0].length;
+                    " | Liczba kolumn: " + sapData[0].length +
+                    " | Usunięte powtórzone nagłówki: " +
+                    repeatedHeaders;
 
                 if (skippedLines > 0) {
                     message +=
-                        " | Pominięto wiersze o niezgodnej liczbie kolumn: " +
+                        " | Pominięte wiersze o niezgodnej " +
+                        "liczbie kolumn: " +
                         skippedLines;
                 }
 
-                setStatus(message, skippedLines > 0 ? "" : "success");
+                setStatus(
+                    message,
+                    skippedLines > 0 ? "" : "success"
+                );
 
             } catch (error) {
                 resetData();
-                setStatus("Błąd: " + error.message, "error");
+
+                setStatus(
+                    "Błąd: " + error.message,
+                    "error"
+                );
             }
         });
 
@@ -374,20 +431,30 @@
             preview.textContent = "";
 
             if (!sapData.length) {
-                preview.textContent = "Brak danych do wyświetlenia.";
+                preview.textContent =
+                    "Brak danych do wyświetlenia.";
+
                 return;
             }
 
-            const wrapper = document.createElement("div");
+            const wrapper =
+                document.createElement("div");
+
             wrapper.className = "table-wrapper";
 
-            const table = document.createElement("table");
+            const table =
+                document.createElement("table");
 
-            const thead = document.createElement("thead");
-            const headerRow = document.createElement("tr");
+            const thead =
+                document.createElement("thead");
+
+            const headerRow =
+                document.createElement("tr");
 
             sapData[0].forEach(header => {
-                const th = document.createElement("th");
+                const th =
+                    document.createElement("th");
+
                 th.textContent = header;
                 headerRow.appendChild(th);
             });
@@ -395,13 +462,18 @@
             thead.appendChild(headerRow);
             table.appendChild(thead);
 
-            const tbody = document.createElement("tbody");
+            const tbody =
+                document.createElement("tbody");
 
+            // Podgląd 10 pierwszych wierszy danych.
             sapData.slice(1, 11).forEach(row => {
-                const tr = document.createElement("tr");
+                const tr =
+                    document.createElement("tr");
 
                 row.forEach(value => {
-                    const td = document.createElement("td");
+                    const td =
+                        document.createElement("td");
+
                     td.textContent = value;
                     tr.appendChild(td);
                 });
@@ -415,40 +487,58 @@
         }
 
         exportButton.addEventListener("click", function () {
+
             if (!sapData.length) {
-                setStatus("Najpierw wybierz plik TXT.", "error");
+                setStatus(
+                    "Najpierw wybierz plik TXT.",
+                    "error"
+                );
+
                 return;
             }
 
             if (typeof XLSX === "undefined") {
                 setStatus(
                     "Nie udało się załadować biblioteki Excel. " +
-                    "Sprawdź połączenie z internetem i odśwież stronę.",
+                    "Sprawdź połączenie z internetem i " +
+                    "odśwież stronę.",
                     "error"
                 );
+
                 return;
             }
 
             try {
-                const workbook = XLSX.utils.book_new();
+                const workbook =
+                    XLSX.utils.book_new();
 
-                // Dane pozostają tekstem, tak jak w dotychczasowym kodzie.
-                const worksheet = XLSX.utils.aoa_to_sheet(sapData);
+                // Dane pozostają tekstem, tak jak
+                // w dotychczasowym kodzie.
+                const worksheet =
+                    XLSX.utils.aoa_to_sheet(sapData);
 
-                const widths = sapData[0].map((header, index) => {
-                    let maxLength = String(header).length;
+                // Dopasowanie szerokości kolumn.
+                const widths = sapData[0].map(
+                    (header, index) => {
 
-                    sapData.slice(1, 101).forEach(row => {
-                        maxLength = Math.max(
-                            maxLength,
-                            String(row[index] ?? "").length
-                        );
-                    });
+                        let maxLength =
+                            String(header).length;
 
-                    return {
-                        wch: Math.min(Math.max(maxLength + 2, 10), 35)
-                    };
-                });
+                        sapData.slice(1, 101).forEach(row => {
+                            maxLength = Math.max(
+                                maxLength,
+                                String(row[index] ?? "").length
+                            );
+                        });
+
+                        return {
+                            wch: Math.min(
+                                Math.max(maxLength + 2, 10),
+                                35
+                            )
+                        };
+                    }
+                );
 
                 worksheet["!cols"] = widths;
 
@@ -458,19 +548,29 @@
                     "Warehouse Order"
                 );
 
-                const baseName = sourceFileName.replace(/\.txt$/i, "");
-                const outputName = (baseName || "Raport_SAP") + ".xlsx";
+                const baseName = sourceFileName.replace(
+                    /\.txt$/i,
+                    ""
+                );
 
-                XLSX.writeFile(workbook, outputName);
+                const outputName =
+                    (baseName || "Raport_SAP") + ".xlsx";
+
+                XLSX.writeFile(
+                    workbook,
+                    outputName
+                );
 
                 setStatus(
-                    "Plik Excel został przygotowany: " + outputName,
+                    "Plik Excel został przygotowany: " +
+                    outputName,
                     "success"
                 );
 
             } catch (error) {
                 setStatus(
-                    "Nie udało się utworzyć pliku Excel: " + error.message,
+                    "Nie udało się utworzyć pliku Excel: " +
+                    error.message,
                     "error"
                 );
             }
