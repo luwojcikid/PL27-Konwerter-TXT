@@ -1,683 +1,480 @@
-
 <!DOCTYPE html>
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Konwerter SAP TXT do Excel</title>
 
-    <!-- SheetJS -->
+    <!-- Biblioteka do tworzenia plików Excel -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
+        * {
+            box-sizing: border-box;
+        }
+
         body {
+            margin: 0;
+            padding: 30px;
+
             font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f9;
+
+            background: #f2f5f9;
+            color: #243247;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
         }
 
         h1 {
-            color: #333;
+            margin-top: 0;
+            margin-bottom: 10px;
         }
 
-        .file-container {
+        .description {
+            margin-bottom: 25px;
+            color: #66758a;
+        }
+
+        .panel {
+            padding: 24px;
+            margin-bottom: 24px;
+
             background: #fff;
-            padding: 20px;
-            border-radius: 6px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
+
+            border: 1px solid #dce4ee;
+            border-radius: 12px;
+
+            box-shadow: 0 3px 12px rgba(30, 50, 80, 0.06);
+        }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
         }
 
         input[type="file"] {
-            margin-bottom: 15px;
-            font-size: 14px;
+            display: block;
+
+            width: 100%;
+            max-width: 600px;
+
+            padding: 12px;
+            margin-bottom: 18px;
+
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+
+            background: #f8fafc;
         }
 
         button {
-            padding: 10px 20px;
-            font-size: 16px;
-            background-color: #28a745;
-            color: white;
+            padding: 12px 20px;
+
             border: none;
-            border-radius: 4px;
+            border-radius: 8px;
+
+            background: #1769c2;
+            color: #fff;
+
+            font-size: 15px;
+            font-weight: bold;
+
             cursor: pointer;
         }
 
         button:hover {
-            background-color: #218838;
+            background: #10549e;
         }
 
-        #outputTable {
-            margin-top: 20px;
-            overflow-x: auto;
-            background: #fff;
-            padding: 10px;
-            border-radius: 4px;
-            box-shadow: 0 0 5px rgba(0,0,0,0.1);
+        button:disabled {
+            background: #aab7c7;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 18px;
+            padding: 12px 14px;
+
+            border-radius: 8px;
+            background: #edf4fc;
+        }
+
+        .status.error {
+            background: #fff0f0;
+            color: #9f2020;
+        }
+
+        .status.success {
+            background: #eaf8ef;
+            color: #22633c;
+        }
+
+        .table-wrapper {
+            overflow: auto;
+            max-height: 500px;
+
+            border: 1px solid #dce4ee;
+            border-radius: 8px;
         }
 
         table {
-            border-collapse: collapse;
             width: 100%;
-            margin-bottom: 20px;
-            font-size: 12px;
+            border-collapse: collapse;
+            white-space: nowrap;
+            font-size: 13px;
         }
 
         th,
         td {
-            border: 1px solid #ddd;
-            padding: 6px;
+            padding: 9px 11px;
+            border: 1px solid #e0e6ee;
             text-align: left;
-            white-space: nowrap;
         }
 
         th {
-            background-color: #f2f2f2;
             position: sticky;
             top: 0;
+
+            background: #1769c2;
+            color: white;
+
+            z-index: 1;
+        }
+
+        tr:nth-child(even) td {
+            background: #f8fafc;
         }
 
         .info {
-            margin-top: 10px;
-            color: #555;
-            font-size: 13px;
+            color: #66758a;
+            font-size: 14px;
+            line-height: 1.5;
         }
     </style>
 </head>
 
 <body>
+    <div class="container">
 
-    <h1>Konwerter SAP TXT do Excel</h1>
+        <h1>Konwerter SAP TXT do Excel</h1>
 
-    <div class="file-container">
+        <p class="description">
+            Wczytaj raport SAP w formacie TXT i zapisz go jako plik Excel.
+        </p>
 
-        <label for="fileInput">
-            <strong>Wybierz raport SAP TXT:</strong>
-        </label>
+        <div class="panel">
 
-        <br><br>
+            <label for="fileInput">
+                Wybierz raport SAP TXT:
+            </label>
 
-        <input
-            type="file"
-            id="fileInput"
-            accept=".txt"
-            onchange="loadFile()"
-        >
+            <input
+                type="file"
+                id="fileInput"
+                accept=".txt,text/plain"
+            >
 
-        <br>
+            <button id="exportButton" disabled>
+                Pobierz plik Excel
+            </button>
 
-        <button onclick="exportToExcel()">
-            Eksportuj do Excela
-        </button>
+            <div id="status" class="status">
+                Wybierz plik TXT, aby rozpocząć.
+            </div>
 
-        <div class="info">
-            Format: SAP → Resource Mgmt → Queue → Warehouse Order
+            <p class="info">
+                Oryginalne nagłówki SAP zostaną zachowane.
+                Kolumna <strong>Counter</strong> zostanie usunięta.
+            </p>
+
+        </div>
+
+        <div class="panel">
+
+            <h2>Podgląd danych</h2>
+
+            <p class="info">
+                Podgląd pokazuje maksymalnie 10 pierwszych wierszy.
+                Do Excela zostaną zapisane wszystkie poprawnie odczytane wiersze.
+            </p>
+
+            <div id="preview">
+                Wybierz plik TXT, aby zobaczyć podgląd.
+            </div>
+
         </div>
 
     </div>
 
-    <h3>Podgląd danych:</h3>
+    <script>
+        const fileInput = document.getElementById("fileInput");
+        const exportButton = document.getElementById("exportButton");
+        const statusBox = document.getElementById("status");
+        const preview = document.getElementById("preview");
 
-    <div id="outputTable">
-        <i>Wybierz plik TXT, aby zobaczyć podgląd...</i>
-    </div>
+        let sapData = [];
+        let sourceFileName = "";
 
-
-<script>
-
-    let selectedFile = null;
-
-    let sapData = [];
-
-
-    // =========================================================
-    // CZYSZCZENIE TEKSTU
-    // =========================================================
-
-    function cleanText(value) {
-
-        if (
-            value === null ||
-            value === undefined
-        ) {
-            return '';
+        function setStatus(message, type = "") {
+            statusBox.textContent = message;
+            statusBox.className = "status" + (type ? " " + type : "");
         }
 
-        return String(value)
-
-            // Zamiana twardej spacji SAP
-            .replace(/\u00A0/g, ' ')
-
-            // Spacje z początku
-            .replace(/^\s+/, '')
-
-            // Spacje z końca
-            .replace(/\s+$/, '');
-    }
-
-
-    // =========================================================
-    // WCZYTANIE PLIKU
-    // =========================================================
-
-    function loadFile() {
-
-        const fileInput =
-            document.getElementById('fileInput');
-
-        const file =
-            fileInput.files[0];
-
-        if (!file) {
-            return;
+        function cleanText(value) {
+            return String(value ?? "")
+                .replace(/\u00A0/g, " ")
+                .trim();
         }
 
-        selectedFile = file;
-
-        const reader =
-            new FileReader();
-
-
-        reader.onload = function(e) {
-
-            const content =
-                e.target.result;
-
-
-            // =================================================
-            // PODZIAŁ NA WIERSZE
-            // =================================================
-
-            const lines =
-                content
-                    .replace(/\r\n/g, '\n')
-                    .replace(/\r/g, '\n')
-                    .split('\n');
-
-
-            sapData = [];
-
-
-            // =================================================
-            // SZUKAMY NAGŁÓWKA
-            // =================================================
-
-            let headerFound = false;
-
-
-            lines.forEach(function(line) {
-
-                // Pomijamy wszystko bez separatora |
-                if (!line.includes('|')) {
-                    return;
-                }
-
-
-                // Pomijamy linie z samych kresek
-                if (
-                    line.replace(/[|\-\s]/g, '') === ''
-                ) {
-                    return;
-                }
-
-
-                // =================================================
-                // PODZIAŁ PO |
-                // =================================================
-
-                let columns =
-                    line.split('|');
-
-
-                // Usunięcie pustego elementu
-                // przed pierwszą kolumną
-
-                if (
-                    columns.length >= 2 &&
-                    columns[0].trim() === ''
-                ) {
-                    columns.shift();
-                }
-
-
-                // Usunięcie pustego elementu
-                // po ostatniej kolumnie
-
-                if (
-                    columns.length >= 1 &&
-                    columns[columns.length - 1].trim() === ''
-                ) {
-                    columns.pop();
-                }
-
-
-                // =================================================
-                // CZYSZCZENIE KOLUMN
-                // =================================================
-
-                columns =
-                    columns.map(function(column) {
-
-                        return cleanText(column);
-
-                    });
-
-
-                // =================================================
-                // ZNALEZIENIE NAGŁÓWKA
-                // =================================================
-
-                if (
-                    !headerFound &&
-                    columns.includes('Whse Order')
-                ) {
-
-                    /*
-                     * Usuwamy pierwszą kolumnę:
-                     *
-                     * Counter
-                     */
-
-                    columns.shift();
-
-
-                    sapData.push(columns);
-
-
-                    headerFound = true;
-
-
-                    return;
-                }
-
-
-                // =================================================
-                // WIERSZE DANYCH
-                // =================================================
-
-                if (headerFound) {
-
-                    /*
-                     * Usuwamy pierwszą kolumnę:
-                     *
-                     * Counter
-                     */
-
-                    columns.shift();
-
-
-                    const hasData =
-                        columns.some(function(column) {
-
-                            return column !== '';
-
-                        });
-
-
-                    if (hasData) {
-
-                        sapData.push(columns);
-
-                    }
-
-                }
-
-            });
-
-
-            // =================================================
-            // PODGLĄD
-            // =================================================
-
-            showPreview();
-
-        };
-
-
-        reader.onerror = function() {
-
-            alert(
-                'Nie udało się odczytać pliku.'
-            );
-
-        };
-
-
-        // Odczyt TXT
-        reader.readAsText(
-            file,
-            'UTF-8'
-        );
-
-    }
-
-
-    // =========================================================
-    // PODGLĄD
-    // =========================================================
-
-    function showPreview() {
-
-        const output =
-            document.getElementById('outputTable');
-
-
-        if (
-            !sapData ||
-            sapData.length === 0
-        ) {
-
-            output.innerHTML =
-                '<b>Nie znaleziono danych SAP.</b>';
-
-            return;
-        }
-
-
-        let html =
-            '<table>';
-
-
-        // =================================================
-        // NAGŁÓWEK
-        // =================================================
-
-        html += '<thead>';
-
-        html += '<tr>';
-
-
-        sapData[0].forEach(function(column) {
-
-            html +=
-                '<th>' +
-                escapeHtml(column) +
-                '</th>';
-
-        });
-
-
-        html += '</tr>';
-
-        html += '</thead>';
-
-
-        // =================================================
-        // DANE
-        // =================================================
-
-        html += '<tbody>';
-
-
-        /*
-         * Podgląd maksymalnie 100 rekordów.
-         * Eksport obejmuje wszystkie rekordy.
-         */
-
-        const previewRows =
-            Math.min(
-                sapData.length,
-                101
-            );
-
-
-        for (
-            let i = 1;
-            i < previewRows;
-            i++
-        ) {
-
-            html += '<tr>';
-
-
-            sapData[i].forEach(function(column) {
-
-                html +=
-                    '<td>' +
-                    escapeHtml(column) +
-                    '</td>';
-
-            });
-
-
-            html += '</tr>';
-
-        }
-
-
-        html += '</tbody>';
-
-        html += '</table>';
-
-
-        html +=
-            '<div class="info">' +
-            'Znaleziono ' +
-            (sapData.length - 1) +
-            ' rekordów.' +
-            '</div>';
-
-
-        output.innerHTML = html;
-
-    }
-
-
-    // =========================================================
-    // ZABEZPIECZENIE HTML
-    // =========================================================
-
-    function escapeHtml(text) {
-
-        const div =
-            document.createElement('div');
-
-        div.textContent = text;
-
-        return div.innerHTML;
-
-    }
-
-
-    // =========================================================
-    // EKSPORT DO EXCEL
-    // =========================================================
-
-    function exportToExcel() {
-
-        if (
-            !sapData ||
-            sapData.length === 0
-        ) {
-
-            alert(
-                'Najpierw wybierz prawidłowy plik SAP TXT.'
-            );
-
-            return;
-        }
-
-
-        // =================================================
-        // NOWY SKOROSZYT
-        // =================================================
-
-        const wb =
-            XLSX.utils.book_new();
-
-
-        // =================================================
-        // CZYSZCZENIE DANYCH
-        // =================================================
-
-        const cleanedData =
-            sapData.map(function(row) {
-
-                return row.map(function(cell) {
-
-                    return cleanText(cell);
-
-                });
-
-            });
-
-
-        // =================================================
-        // UTWORZENIE ARKUSZA
-        // =================================================
-
-        const ws =
-            XLSX.utils.aoa_to_sheet(
-                cleanedData
-            );
-
-
-        // =================================================
-        // WSZYSTKO JAKO TEKST
-        // =================================================
-
-        Object.keys(ws).forEach(function(address) {
+        function splitSapLine(line) {
+            let columns = line.split("|");
+
+            if (columns.length && columns[0].trim() === "") {
+                columns.shift();
+            }
 
             if (
-                address.startsWith('!')
+                columns.length &&
+                columns[columns.length - 1].trim() === ""
             ) {
+                columns.pop();
+            }
+
+            return columns.map(cleanText);
+        }
+
+        function resetData() {
+            sapData = [];
+            sourceFileName = "";
+            exportButton.disabled = true;
+
+            preview.textContent =
+                "Wybierz plik TXT, aby zobaczyć podgląd.";
+        }
+
+        fileInput.addEventListener("change", async function () {
+            resetData();
+
+            const file = fileInput.files[0];
+
+            if (!file) {
+                setStatus("Wybierz plik TXT, aby rozpocząć.");
                 return;
             }
 
+            setStatus("Odczytywanie pliku...");
 
-            const cell =
-                ws[address];
+            try {
+                const content = await file.text();
 
+                const lines = content
+                    .replace(/\r\n/g, "\n")
+                    .replace(/\r/g, "\n")
+                    .split("\n");
 
-            if (cell) {
+                let originalHeader = null;
+                let counterIndex = -1;
+                let skippedLines = 0;
+                let rows = [];
 
-                cell.t = 's';
-
-                cell.v =
-                    cleanText(cell.v);
-
-            }
-
-        });
-
-
-        // =================================================
-        // SZEROKOŚĆ KOLUMN
-        // =================================================
-
-        const maxCols =
-            Math.max(
-                ...cleanedData.map(
-                    row => row.length
-                )
-            );
-
-
-        const columnWidths = [];
-
-
-        for (
-            let col = 0;
-            col < maxCols;
-            col++
-        ) {
-
-            let maxLength = 10;
-
-
-            cleanedData.forEach(function(row) {
-
-                if (
-                    row[col] !== undefined &&
-                    row[col] !== null
-                ) {
-
-                    const length =
-                        String(row[col]).length;
-
-
-                    if (
-                        length > maxLength
-                    ) {
-
-                        maxLength =
-                            length;
-
+                for (const line of lines) {
+                    if (!line.includes("|")) {
+                        continue;
                     }
 
+                    // Pominięcie linii oddzielających z samych kresek.
+                    if (line.replace(/[|\-\s]/g, "") === "") {
+                        continue;
+                    }
+
+                    const columns = splitSapLine(line);
+
+                    if (!originalHeader) {
+                        if (
+                            columns.includes("Whse Order") &&
+                            columns.includes("Counter")
+                        ) {
+                            originalHeader = columns;
+                            counterIndex = columns.indexOf("Counter");
+
+                            const header = columns.filter(
+                                (_, index) => index !== counterIndex
+                            );
+
+                            rows.push(header);
+                        }
+
+                        continue;
+                    }
+
+                    // Wiersz musi mieć taką samą liczbę pól jak nagłówek.
+                    if (columns.length !== originalHeader.length) {
+                        skippedLines++;
+                        continue;
+                    }
+
+                    const row = columns.filter(
+                        (_, index) => index !== counterIndex
+                    );
+
+                    if (row.some(value => value !== "")) {
+                        rows.push(row);
+                    }
                 }
 
+                if (!originalHeader) {
+                    throw new Error(
+                        "Nie znaleziono nagłówków „Counter” i „Whse Order”. " +
+                        "Sprawdź, czy wybrano właściwy raport SAP."
+                    );
+                }
+
+                if (rows.length <= 1) {
+                    throw new Error(
+                        "Znaleziono nagłówek, ale nie znaleziono żadnych danych."
+                    );
+                }
+
+                sapData = rows;
+                sourceFileName = file.name;
+                exportButton.disabled = false;
+
+                showPreview();
+
+                let message =
+                    "Wczytano plik: " + file.name +
+                    " | Liczba wierszy: " + (sapData.length - 1) +
+                    " | Liczba kolumn po usunięciu Counter: " +
+                    sapData[0].length;
+
+                if (skippedLines > 0) {
+                    message +=
+                        " | Pominięto wiersze o niezgodnej liczbie kolumn: " +
+                        skippedLines;
+                }
+
+                setStatus(message, skippedLines > 0 ? "" : "success");
+
+            } catch (error) {
+                resetData();
+                setStatus("Błąd: " + error.message, "error");
+            }
+        });
+
+        function showPreview() {
+            preview.textContent = "";
+
+            if (!sapData.length) {
+                preview.textContent = "Brak danych do wyświetlenia.";
+                return;
+            }
+
+            const wrapper = document.createElement("div");
+            wrapper.className = "table-wrapper";
+
+            const table = document.createElement("table");
+
+            const thead = document.createElement("thead");
+            const headerRow = document.createElement("tr");
+
+            sapData[0].forEach(header => {
+                const th = document.createElement("th");
+                th.textContent = header;
+                headerRow.appendChild(th);
             });
 
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
 
-            columnWidths.push({
+            const tbody = document.createElement("tbody");
 
-                wch:
-                    Math.min(
-                        maxLength + 2,
-                        30
-                    )
+            sapData.slice(1, 11).forEach(row => {
+                const tr = document.createElement("tr");
 
+                row.forEach(value => {
+                    const td = document.createElement("td");
+                    td.textContent = value;
+                    tr.appendChild(td);
+                });
+
+                tbody.appendChild(tr);
             });
 
+            table.appendChild(tbody);
+            wrapper.appendChild(table);
+            preview.appendChild(wrapper);
         }
 
+        exportButton.addEventListener("click", function () {
+            if (!sapData.length) {
+                setStatus("Najpierw wybierz plik TXT.", "error");
+                return;
+            }
 
-        ws['!cols'] =
-            columnWidths;
+            if (typeof XLSX === "undefined") {
+                setStatus(
+                    "Nie udało się załadować biblioteki Excel. " +
+                    "Sprawdź połączenie z internetem i odśwież stronę.",
+                    "error"
+                );
+                return;
+            }
 
+            try {
+                const workbook = XLSX.utils.book_new();
 
-        // =================================================
-        // ZAMROŻENIE NAGŁÓWKA
-        // =================================================
+                // Dane pozostają tekstem, tak jak w dotychczasowym kodzie.
+                const worksheet = XLSX.utils.aoa_to_sheet(sapData);
 
-        ws['!freeze'] = {
-            xSplit: 0,
-            ySplit: 1
-        };
+                const widths = sapData[0].map((header, index) => {
+                    let maxLength = String(header).length;
 
+                    sapData.slice(1, 101).forEach(row => {
+                        maxLength = Math.max(
+                            maxLength,
+                            String(row[index] ?? "").length
+                        );
+                    });
 
-        // =================================================
-        // DODANIE ARKUSZA
-        // =================================================
+                    return {
+                        wch: Math.min(Math.max(maxLength + 2, 10), 35)
+                    };
+                });
 
-        XLSX.utils.book_append_sheet(
-            wb,
-            ws,
-            'Warehouse Order'
-        );
+                worksheet["!cols"] = widths;
 
+                XLSX.utils.book_append_sheet(
+                    workbook,
+                    worksheet,
+                    "Warehouse Order"
+                );
 
-        // =================================================
-        // NAZWA PLIKU
-        // =================================================
+                const baseName = sourceFileName.replace(/\.txt$/i, "");
+                const outputName = (baseName || "Raport_SAP") + ".xlsx";
 
-        const today =
-            new Date()
-                .toISOString()
-                .slice(0, 10);
+                XLSX.writeFile(workbook, outputName);
 
+                setStatus(
+                    "Plik Excel został przygotowany: " + outputName,
+                    "success"
+                );
 
-        const filename =
-            'SAP_Warehouse_Order_' +
-            today +
-            '.xlsx';
-
-
-        // =================================================
-        // EKSPORT
-        // =================================================
-
-        XLSX.writeFile(
-            wb,
-            filename
-        );
-
-    }
-
-</script>
-
+            } catch (error) {
+                setStatus(
+                    "Nie udało się utworzyć pliku Excel: " + error.message,
+                    "error"
+                );
+            }
+        });
+    </script>
 </body>
 </html>
-```
