@@ -486,6 +486,34 @@
             preview.appendChild(wrapper);
         }
 
+        // Zamiana dat SAP na liczby dat Excela bez zależności od strefy czasowej.
+        function excelDate(value) {
+            const text = cleanText(value);
+            let m = text.match(/^(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})$/);
+            let day, month, year;
+            if (m) {
+                day = +m[1]; month = +m[2]; year = +m[3];
+            } else {
+                m = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+                if (!m) return null;
+                year = +m[1]; month = +m[2]; day = +m[3];
+            }
+            if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return null;
+            const date = new Date(Date.UTC(year, month - 1, day));
+            if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
+            let serial = (date.getTime() - Date.UTC(1899, 11, 31)) / 86400000;
+            if (serial >= 60) serial++; // Uwzględnia numerację dat Excela.
+            return serial;
+        }
+
+        function excelTime(value) {
+            const m = cleanText(value).match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+            if (!m) return null;
+            const hours = +m[1], minutes = +m[2], seconds = +(m[3] || 0);
+            if (hours > 23 || minutes > 59 || seconds > 59) return null;
+            return (hours * 3600 + minutes * 60 + seconds) / 86400;
+        }
+
         exportButton.addEventListener("click", function () {
 
             if (!sapData.length) {
@@ -512,10 +540,26 @@
                 const workbook =
                     XLSX.utils.book_new();
 
-                // Dane pozostają tekstem, tak jak
-                // w dotychczasowym kodzie.
-                const worksheet =
-                    XLSX.utils.aoa_to_sheet(sapData);
+                const worksheet = XLSX.utils.aoa_to_sheet(sapData);
+                // Numery odnoszą się do kolumn wynikowego pliku,
+                // po usunięciu kolumny Counter.
+                const dateColumns = [10, 14, 19, 22]; // K, O, T, W
+                const timeColumns = [11, 15, 20, 23]; // L, P, U, X
+                let unrecognized = 0;
+                for (let rowIndex = 1; rowIndex < sapData.length; rowIndex++) {
+                    for (const col of [...dateColumns, ...timeColumns]) {
+                        const value = sapData[rowIndex][col];
+                        if (value === undefined || cleanText(value) === "") continue;
+                        const isDate = dateColumns.includes(col);
+                        const number = isDate ? excelDate(value) : excelTime(value);
+                        if (number === null) {
+                            unrecognized++;
+                            continue; // Nie usuwamy wartości, której nie udało się rozpoznać.
+                        }
+                        const address = XLSX.utils.encode_cell({ r: rowIndex, c: col });
+                        worksheet[address] = { t: "n", v: number, z: isDate ? "dd.mm.yyyy" : "hh:mm:ss" };
+                    }
+                }
 
                 // Dopasowanie szerokości kolumn.
                 const widths = sapData[0].map(
@@ -563,8 +607,10 @@
 
                 setStatus(
                     "Plik Excel został przygotowany: " +
-                    outputName,
-                    "success"
+                    outputName + (unrecognized ?
+                        " | Nie rozpoznano daty lub godziny w " + unrecognized +
+                        " komórkach — pozostawiono je jako tekst." : ""),
+                    unrecognized ? "" : "success"
                 );
 
             } catch (error) {
